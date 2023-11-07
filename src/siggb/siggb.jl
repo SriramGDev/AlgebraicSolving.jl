@@ -58,7 +58,7 @@ julia> sig_groebner_basis(Fhom)
  ((4, x2*x3), x3^2*x4^4 + x2*x3*x5^4 + 16*x2*x4*x5^4 + x3*x4*x5^4 + 15*x4^2*x5^4)
 ```
 """
-function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) where {T <: MPolyRingElem}
+function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0, syz_pre::Vector{Tuple{Int64,T}}=Vector{Tuple{Int64,T}}(undef, 0)) where {T <: MPolyRingElem}
     R = first(sys).parent
     Rchar = characteristic(R)
 
@@ -167,6 +167,23 @@ function sig_groebner_basis(sys::Vector{T}; info_level::Int=0, degbound::Int=0) 
         basis.sigmasks[i] = (SigIndex(i), dm_one_mon)
         pairset.elems[i].top_sig_mask = basis.sigmasks[i][2]
         basis.lm_masks[i] = basis_ht.hashdata[basis.monomials[i][1]].divmask
+    end
+
+    # update syz with known syzygies
+    @inbounds for s in syz_pre
+	# resize if necessary
+	if basis.syz_load == basis.syz_size
+	    basis.syz_size *= 2
+	    resize!(basis.syz_sigs, basis.syz_size)
+	    resize!(basis.syz_masks, basis.syz_size)
+	end
+
+	# add known syz sig
+	l = basis.syz_load + 1
+	syz_mon = monomial(SVector{nv}((Exp).(collect(exponent_vectors(s[2]))[1])))
+	basis.syz_sigs[l] = syz_mon
+	basis.syz_masks[l] = (s[1], divmask(syz_mon, basis_ht.divmap, basis_ht.ndivbits))
+	basis.syz_load += 1
     end
 
     logger = ConsoleLogger(stdout, info_level == 0 ? Warn : Info)
